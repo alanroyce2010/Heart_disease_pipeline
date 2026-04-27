@@ -1,0 +1,11 @@
+pytest>=7.4
+pytest-mock>=3.11
+pytest-cov>=4.1
+responses>=0.23
+numpy>=1.24
+pandas>=2.0
+scipy>=1.11
+prometheus-client>=0.17
+requests>=2.31
+pytest-playwright
+ playwright

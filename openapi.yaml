@@ -1,0 +1,49 @@
+openapi: 3.0.0
+info:
+  title: Heart Disease Prediction API
+  version: 1.0.0
+  description: REST API for predicting heart disease probability
+
+servers:
+  - url: http://localhost:8001
+
+paths:
+  /invocations:
+    post:
+      summary: Predict heart disease probability
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dataframe_split:
+                  type: object
+                  properties:
+                    columns:
+                      type: array
+                      items:
+                        type: string
+                    data:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: number
+      responses:
+        "200":
+          description: Prediction result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  predictions:
+                    type: array
+                    items:
+                      type: number
+        "400":
+          description: Invalid input
+        "500":
+          description: Server error

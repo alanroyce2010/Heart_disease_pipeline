@@ -1,0 +1,57 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+# ── Alertmanager ─────────────────────────────────────────────────────────────
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "alertmanager:9093"
+
+rule_files:
+  - "/etc/prometheus/rules/recording_rules.yml"
+  - "/etc/prometheus/rules/alerting_rules.yml"
+
+scrape_configs:
+
+  # ── Streamlit app (Prometheus metrics on :8502) ───────────────────────────
+  - job_name: streamlit_app
+    static_configs:
+      - targets: ["hd_streamlit:8502"]
+        labels:
+          app: heart_disease
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # ── MLflow tracking server ────────────────────────────────────────────────
+  - job_name: mlflow_tracking
+    static_configs:
+      - targets: ["mlflow:5000"]
+        labels:
+          app: heart_disease
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # ── MLflow model serve ────────────────────────────────────────────────────
+  # - job_name: mlflow_serve
+  #   static_configs:
+  #     - targets: ["mlflow-serve:8001"]
+  #       labels:
+  #         app: heart_disease
+  #   metrics_path: /metrics
+  #   scrape_interval: 15s
+
+  # ── Prometheus self-monitoring ────────────────────────────────────────────
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── Node exporter (host CPU / RAM / Disk) ─────────────────────────────────
+  - job_name: node_exporter
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["node_exporter:9100"]
+        labels:
+          host: local-machine
+          app: heart_disease

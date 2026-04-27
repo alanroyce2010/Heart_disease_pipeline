@@ -1,0 +1,30 @@
+{
+  "model": "sklearn",
+  "overall_oof_auc": 0.952519,
+  "overall_oof_ap": 0.945471,
+  "mean_fold_auc": 0.95252,
+  "std_fold_auc": 0.000345,
+  "fold_scores": [
+    {
+      "fold": 1,
+      "ens_auc": 0.952883
+    },
+    {
+      "fold": 2,
+      "ens_auc": 0.952039
+    },
+    {
+      "fold": 3,
+      "ens_auc": 0.952682
+    },
+    {
+      "fold": 4,
+      "ens_auc": 0.952177
+    },
+    {
+      "fold": 5,
+      "ens_auc": 0.952818
+    }
+  ],
+  "mlflow_run_id": "3a987821a31a4e2b812ffaece8d785f7"
+}

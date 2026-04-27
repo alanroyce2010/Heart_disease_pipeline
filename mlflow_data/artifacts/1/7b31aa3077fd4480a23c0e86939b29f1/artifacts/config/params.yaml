@@ -1,0 +1,151 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DVC params for the pipeline 
+# Edit here; dvc repro picks up changes automatically.
+# ─────────────────────────────────────────────────────────────────────────────
+
+data:
+  train_path: data/raw/train.csv
+  test_path:  data/raw/test.csv
+  raw_path: data/raw/train.csv
+  processed_dir: data/processed
+  target:     Heart Disease
+  id_col:     id
+
+features:
+  digit_enabled:   true
+  binning_enabled: true
+  cats_enabled:    true
+  # Numeric columns to bin
+  binning_cols:    [Age, BP, Cholesterol, Max HR, ST depression]
+  binning_qs:      [4, 5, 10, 20]
+  binning_cuts:    [5, 10]
+
+train:
+  n_splits:    5
+  random_state: 42
+  test_size: 0.2
+
+
+
+mlflow:
+  tracking_uri: http://mlflow:5000
+  experiment: heart_disease
+  model_name: heart_disease_best
+ 
+# ── RealMLP ────────────────────────────────────────────────────────────────
+realmlp:
+  common:
+    act:                       mish
+    ls_eps_sched:              coslog4
+    p_drop_sched:              flat_cos
+    wd_sched:                  flat_cos
+    embedding_size:            8
+    bias_wd_factor:            0.0
+    weight_param:              ntk
+    bias_lr_factor:            0.1
+    use_parametric_act:        true
+    add_front_scale:           true
+    act_lr_factor:             0.1
+    block_str:                 "w-b-a-d"
+    max_one_hot_cat_size:      9
+    hidden_sizes:              rectangular
+    bias_init_mode:            "he+5"
+    weight_init_mode:          std
+    val_metric_name:           "1-auc_ovr"
+    num_emb_type:              pbld
+    verbosity:                 2
+    batch_size:                1024
+    random_state:              42
+    n_epochs:                  32
+    early_stopping_additive_patience:       40
+    early_stopping_multiplicative_patience: 3
+    n_ens:                     8
+    ens_av_before_softmax:     false
+
+  top3_params:
+    - n_hidden_layers:  4
+      hidden_width:     512
+      embedding_size:   4
+      lr:               0.1301052035689966
+      wd:               0.04914969178803988
+      p_drop:           0.02682248660489578
+      scale_lr_factor:  2.1896500647074553
+      use_ls:           false
+      ls_eps:           0.04088400565558735
+      plr_sigma:        1.668950443527603
+      plr_lr_factor:    0.27098419375438565
+      plr_hidden_1:     8
+      plr_hidden_2:     8
+      sq_mom:           0.9855686567493073
+      first_layer_lr_factor: 1.3750227365258307
+      use_early_stopping:    true
+      max_one_hot_cat_size:  15
+
+    - n_hidden_layers:  2
+      hidden_width:     512
+      embedding_size:   8
+      lr:               0.03865822397961398
+      wd:               0.00851274626094165
+      p_drop:           0.2739396730231609
+      scale_lr_factor:  3.6178064047128555
+      use_ls:           false
+      ls_eps:           0.012194703961296842
+      plr_sigma:        1.3478060390217743
+      plr_lr_factor:    0.10119556825550731
+      plr_hidden_1:     8
+      plr_hidden_2:     8
+      sq_mom:           0.9865749129374782
+      first_layer_lr_factor: 0.6175393224001581
+      use_early_stopping:    true
+      max_one_hot_cat_size:  8
+
+    - n_hidden_layers:  2
+      hidden_width:     384
+      embedding_size:   16
+      lr:               0.029186039688349992
+      wd:               0.009702038034899564
+      p_drop:           0.028921980435491934
+      scale_lr_factor:  5.433094297291475
+      use_ls:           false
+      ls_eps:           0.035742411185025844
+      plr_sigma:        48.89920447537555
+      plr_lr_factor:    0.21112939343489906
+      plr_hidden_1:     16
+      plr_hidden_2:     4
+      sq_mom:           0.9947345074902412
+      first_layer_lr_factor: 1.0025819443139303
+      use_early_stopping:    false
+      max_one_hot_cat_size:  4
+ 
+# ── XGBoost ────────────────────────────────────────────────────────────────
+xgboost:
+  n_estimators: 800
+  learning_rate: 0.05
+  max_depth: 5
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_weight: 3
+  gamma: 0.1
+  reg_alpha: 0.1
+  reg_lambda: 1.0
+  scale_pos_weight: 1
+  use_label_encoder: false
+  eval_metric: auc
+  early_stopping_rounds: 50
+  random_state: 42
+ 
+# ── Scikit-learn ensemble ──────────────────────────────────────────────────
+sklearn:
+  rf:
+    n_estimators: 500
+    max_depth: 8
+    min_samples_leaf: 4
+    max_features: sqrt
+    random_state: 42
+  lr:
+    C: 0.1
+    max_iter: 1000
+    solver: lbfgs
+    random_state: 42
+  voting: soft               # soft voting ensemble of all three
+ 

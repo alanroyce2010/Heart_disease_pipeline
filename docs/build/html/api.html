@@ -1,0 +1,226 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Documentation &mdash; Heart Disease MLOps  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Ingest Module" href="ingest.html" />
+    <link rel="prev" title="System Architecture" href="architecture.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Heart Disease MLOps
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">System Architecture</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#base-url">Base URL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#endpoint">Endpoint</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#post-invocations">POST /invocations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#request-format">Request Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#response">Response</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#response-fields">Response Fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#error-handling">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#usage-flow">Usage Flow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#design-considerations">Design Considerations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#stateless-api">Stateless API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#loose-coupling">Loose Coupling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#scalability">Scalability</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ingest.html">Ingest Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="preprocess.html">Preprocess Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="featurize.html">Featurize Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="train_realmlp.html">RealMLP Training Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="train_xgboost.html">XGBoost Training Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="train_sklearn.html">Sklearn Training Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="streamlit_app.html">Streamlit Dashboard</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Heart Disease MLOps</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">API Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/api.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-documentation">
+<h1>API Documentation<a class="headerlink" href="#api-documentation" title="Link to this heading"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>The system exposes a REST API for model inference using MLflow serving.</p>
+<p>All communication between the frontend and backend happens through this API.</p>
+</section>
+<section id="base-url">
+<h2>Base URL<a class="headerlink" href="#base-url" title="Link to this heading"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">localhost</span><span class="p">:</span><span class="mi">8001</span>
+</pre></div>
+</div>
+</section>
+<section id="endpoint">
+<h2>Endpoint<a class="headerlink" href="#endpoint" title="Link to this heading"></a></h2>
+<section id="post-invocations">
+<h3>POST /invocations<a class="headerlink" href="#post-invocations" title="Link to this heading"></a></h3>
+</section>
+</section>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Link to this heading"></a></h2>
+<p>Predicts the probability of heart disease for a given patient.</p>
+</section>
+<section id="request-format">
+<h2>Request Format<a class="headerlink" href="#request-format" title="Link to this heading"></a></h2>
+<p>The API expects input in <code class="docutils literal notranslate"><span class="pre">dataframe_split</span></code> format.</p>
+<p>Example:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;dataframe_split&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;columns&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="s2">&quot;Age&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;BP&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Cholesterol&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Max HR&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;ST depression&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s2">&quot;Sex&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Chest pain type&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;FBS over 120&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;EKG results&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s2">&quot;Exercise angina&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Slope of ST&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Number of vessels fluro&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Thallium&quot;</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">[</span><span class="mi">55</span><span class="p">,</span><span class="w"> </span><span class="mi">130</span><span class="p">,</span><span class="w"> </span><span class="mi">230</span><span class="p">,</span><span class="w"> </span><span class="mi">150</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">]</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="response">
+<h2>Response<a class="headerlink" href="#response" title="Link to this heading"></a></h2>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;predictions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.73</span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="response-fields">
+<h2>Response Fields<a class="headerlink" href="#response-fields" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">predictions</span></code> : list of float
+Probability of heart disease (0 to 1)</p></li>
+</ul>
+</section>
+<section id="error-handling">
+<h2>Error Handling<a class="headerlink" href="#error-handling" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>400 Bad Request
+Invalid input format</p></li>
+<li><p>500 Internal Server Error
+Model inference failed</p></li>
+<li><p>Timeout
+Backend service not reachable</p></li>
+</ul>
+</section>
+<section id="usage-flow">
+<h2>Usage Flow<a class="headerlink" href="#usage-flow" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>User inputs data in the Streamlit UI</p></li>
+<li><p>UI sends POST request to API</p></li>
+<li><p>MLflow processes input and generates prediction</p></li>
+<li><p>Response is returned and displayed</p></li>
+</ol>
+</section>
+<section id="design-considerations">
+<h2>Design Considerations<a class="headerlink" href="#design-considerations" title="Link to this heading"></a></h2>
+<section id="stateless-api">
+<h3>Stateless API<a class="headerlink" href="#stateless-api" title="Link to this heading"></a></h3>
+<p>Each request is independent and does not rely on previous calls.</p>
+</section>
+<section id="loose-coupling">
+<h3>Loose Coupling<a class="headerlink" href="#loose-coupling" title="Link to this heading"></a></h3>
+<p>Frontend does not depend on model implementation.</p>
+</section>
+<section id="scalability">
+<h3>Scalability<a class="headerlink" href="#scalability" title="Link to this heading"></a></h3>
+<p>API can be deployed independently and scaled horizontally.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="architecture.html" class="btn btn-neutral float-left" title="System Architecture" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="ingest.html" class="btn btn-neutral float-right" title="Ingest Module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Alan.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

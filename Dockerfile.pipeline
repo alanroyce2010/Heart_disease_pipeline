@@ -1,0 +1,29 @@
+
+# ── Pipeline image (DVC stages + MLflow client) ───────────────────────────
+FROM python:3.11-slim
+ 
+WORKDIR /opt/pipeline
+ 
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ git curl psmisc
+ 
+# Python deps
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+ 
+# Copy pipeline source
+# COPY src/        ./src/
+# COPY params.yaml .
+# COPY dvc.yaml    .
+# COPY .dvc/       ./.dvc/
+ 
+# Create data directories (CSVs are volume-mounted at runtime)
+RUN mkdir -p data/raw data/processed outputs
+ 
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ 
+CMD ["bash"]
+ 

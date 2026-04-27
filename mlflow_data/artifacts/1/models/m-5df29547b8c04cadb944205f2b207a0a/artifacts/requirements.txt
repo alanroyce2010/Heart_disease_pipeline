@@ -1,0 +1,6 @@
+mlflow==3.11.1
+pytabkit
+pandas
+numpy
+scikit-learn
+torch

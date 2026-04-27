@@ -1,0 +1,27 @@
+# ── Streamlit monitoring app ──────────────────────────────────────────────
+FROM python:3.11-slim
+
+WORKDIR /opt/pipeline
+
+RUN apt-get update && apt-get install -y --no-install-recommends gcc && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir streamlit matplotlib scipy prometheus-client
+
+COPY pipeline/src/streamlit_app.py ./src/
+
+ENV PYTHONUNBUFFERED=1
+ENV PIPELINE_DIR=/opt/pipeline
+ENV MLFLOW_SERVE_URL=http://mlflow-serve:8001
+
+EXPOSE 8501 8502
+
+# 8501 = Streamlit UI   8502 = Prometheus metrics
+CMD ["bash", "-c", "\
+streamlit run src/streamlit_app.py \
+  --server.port=8501 \
+  --server.address=0.0.0.0 \
+  --server.headless=true"]

@@ -1,0 +1,301 @@
+# prometheus/rules/alerting_rules.yml
+# Alerting rules for the Heart Disease MLOps pipeline.
+# Severity levels: critical > warning > info
+
+groups:
+
+  # ── App availability ──────────────────────────────────────────────────────
+  - name: hd_app_health
+    rules:
+
+      - alert: StreamlitDown
+        expr: up{job="streamlit_app"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          team: mlops
+        annotations:
+          summary: "Streamlit app is DOWN"
+          description: >
+            The /metrics endpoint on the Streamlit app ({{ $labels.instance }})
+            has been unreachable for 30 seconds. Users cannot make predictions.
+          runbook: "docker compose restart streamlit"
+
+      - alert: MLflowServeDown
+        expr: up{job="mlflow_serve"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          team: mlops
+        annotations:
+          summary: "MLflow model serve is DOWN"
+          description: >
+            The MLflow serve endpoint ({{ $labels.instance }}) is unreachable.
+            All prediction requests from Streamlit will fail.
+          runbook: >
+            docker compose restart mlflow-serve
+            OR re-run: mlflow models serve -m "models:/heart_disease_best/Production" -p 8001
+
+      - alert: MLflowTrackingDown
+        expr: up{job="mlflow_tracking"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "MLflow tracking server is DOWN"
+          description: >
+            The MLflow tracking server ({{ $labels.instance }}) is unreachable.
+            Model registration and experiment logging will fail.
+          runbook: "docker compose restart mlflow"
+
+      - alert: PrometheusMetricsEndpointDown
+        # Streamlit is up (port 8501 responds) but metrics port 8502 is dead
+        expr: up{job="streamlit_app"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Streamlit Prometheus metrics endpoint (:8502) is down"
+          description: >
+            Port 8502 on the Streamlit container is not responding.
+            The prometheus_client background thread may have failed to bind.
+          runbook: "docker compose restart streamlit"
+
+  # ── Prediction activity ───────────────────────────────────────────────────
+  - name: hd_prediction_activity
+    rules:
+
+      - alert: NoPredictionsFor15Minutes
+        expr: |
+          (time() - (
+            streamlit_predictions_total_created
+          )) > 900
+        for: 0m
+        labels:
+          severity: info
+          team: mlops
+        annotations:
+          summary: "No predictions made in the last 15 minutes"
+          description: >
+            The heart disease model has not served any predictions for 15
+            minutes despite the app being up. The model serve endpoint may
+            be returning errors silently.
+
+      - alert: PredictionRateSuddenDrop
+        # Rate drops to 0 after being non-zero in the prior 10 min window
+        expr: |
+          job:hd_predictions:rate5m == 0
+          and
+          avg_over_time(job:hd_predictions:rate5m[10m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Prediction rate dropped to zero"
+          description: >
+            Predictions were flowing in the last 10 minutes but have
+            completely stopped. Check the MLflow serve endpoint and
+            Streamlit logs.
+
+      - alert: HighRiskPredictionSpike
+        # More than 80% of recent predictions are high-risk (prob >= 0.6)
+        expr: job:hd_high_risk_ratio:rate5m > 0.80
+        for: 5m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "High-risk prediction ratio is abnormally high ({{ $value | humanizePercentage }})"
+          description: >
+            Over 80% of predictions in the last 5 minutes returned a
+            heart disease probability >= 0.6. This may indicate a data
+            quality issue or a model scoring anomaly.
+
+  # ── Data drift ────────────────────────────────────────────────────────────
+  - name: hd_drift
+    rules:
+
+      - alert: ModerateDrift
+        # Drift score > 0.3 means more than 30% of features are drifting
+        expr: job:hd_drift_score:current > 0.30
+        for: 2m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Data drift detected ({{ $value | humanizePercentage }} of features)"
+          description: >
+            The drift score is {{ $value | humanize }} — more than 30% of
+            features in the last uploaded batch differ significantly from
+            the training distribution (KS / Chi² at α=0.05).
+            Consider retraining the model.
+
+      - alert: SevereDrift
+        # Drift score > 0.6 means majority of features are drifting
+        expr: job:hd_drift_score:current > 0.60
+        for: 1m
+        labels:
+          severity: critical
+          team: mlops
+        annotations:
+          summary: "Severe data drift — majority of features drifted ({{ $value | humanizePercentage }})"
+          description: >
+            Drift score is {{ $value | humanize }} — over 60% of features
+            show significant distributional shift. Model predictions are
+            likely unreliable. Trigger a retraining pipeline immediately.
+          runbook: "dvc repro && python serve_best.py"
+
+      - alert: DriftFeatureCountHigh
+        # Absolute count — more than 5 specific features drifted
+        expr: job:hd_drift_features:current > 5
+        for: 1m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "{{ $value }} features have drifted"
+          description: >
+            {{ $value }} out of 13 features show significant drift in the
+            latest inference batch. Check the Drift Monitor tab for the
+            specific features and their p-values.
+
+      - alert: DriftScoreSustainedHigh
+        # Drift has been > 0.3 for an entire hour — systemic shift
+        expr: job:hd_drift_score:max1h > 0.30
+        for: 60m
+        labels:
+          severity: critical
+          team: mlops
+        annotations:
+          summary: "Drift score has been elevated for over 1 hour"
+          description: >
+            The maximum drift score in the last hour is {{ $value | humanize }}.
+            This is a sustained distributional shift, not a transient batch
+            anomaly. Retrain the model on fresh data.
+
+  # ── Prediction probability anomalies ─────────────────────────────────────
+  - name: hd_probability_anomalies
+    rules:
+
+      - alert: PredictionProbabilityAlwaysHigh
+        # Median prob > 0.8 — model may be stuck or degenerate
+        expr: job:hd_prediction_prob_p50:rate5m > 0.80
+        for: 5m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Median prediction probability stuck above 0.8"
+          description: >
+            The P50 prediction probability over the last 5 minutes is
+            {{ $value | humanize }} — unusually high. The model may be
+            receiving out-of-distribution inputs or have a scoring defect.
+
+      - alert: PredictionProbabilityAlwaysLow
+        # Median prob < 0.05 — model may be outputting near-zero for everything
+        expr: job:hd_prediction_prob_p50:rate5m < 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Median prediction probability stuck near zero"
+          description: >
+            The P50 prediction probability is {{ $value | humanize }} — the
+            model may be returning degenerate outputs. Check MLflow serve
+            logs and verify the registered model artifact is intact.
+
+  # ── Host resources ────────────────────────────────────────────────────────
+  - name: hd_resource_overuse
+    rules:
+
+      - alert: HostHighCPU
+        expr: instance:node_cpu_usage:avg > 80
+        for: 2m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "Host CPU above 80% ({{ $value | humanize }}%)"
+          description: >
+            Host {{ $labels.instance }} CPU has been above 80% for 2 minutes.
+            RealMLP inference or DVC pipeline retraining may be consuming
+            excessive CPU.
+
+      - alert: HostCriticalCPU
+        expr: instance:node_cpu_usage:avg > 95
+        for: 1m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Host CPU near saturation ({{ $value | humanize }}%)"
+          description: >
+            CPU > 95% for 1 minute — the system may become unresponsive.
+            Kill any running DVC pipeline stages if retraining is in progress.
+
+      - alert: HostHighMemory
+        expr: instance:node_memory_used_percent:gauge > 85
+        for: 2m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "Host memory above 85% ({{ $value | humanize }}%)"
+          description: >
+            Available memory is critically low. The RealMLP / XGBoost model
+            loaded in mlflow-serve may be competing with OS caches or a
+            DVC retraining run.
+
+      - alert: HostCriticalMemory
+        expr: instance:node_memory_used_percent:gauge > 95
+        for: 1m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Host memory near exhaustion ({{ $value | humanize }}%)"
+          description: >
+            Memory > 95% — OOM kill likely imminent. Immediately stop any
+            running training pipelines.
+
+      - alert: HostDiskNearFull
+        expr: instance:node_disk_used_percent:gauge > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "Disk {{ $value | humanize }}% full"
+          description: >
+            Root filesystem on {{ $labels.instance }} has less than 10%
+            free. MLflow artifact storage, DVC cache, and parquet files
+            may fill the disk quickly during retraining.
+
+      - alert: HostDiskCritical
+        expr: instance:node_disk_used_percent:gauge > 97
+        for: 1m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Disk critically full ({{ $value | humanize }}%)"
+          description: >
+            Less than 3% disk space remaining. MLflow logging and DVC
+            outputs will start failing immediately.
+
+      - alert: NodeExporterDown
+        expr: up{job="node_exporter"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "node_exporter is unreachable"
+          description: >
+            System-level metrics (CPU / RAM / Disk) are unavailable because
+            node_exporter on {{ $labels.instance }} is down.
+          runbook: "docker compose restart node_exporter"

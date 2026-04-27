@@ -1,0 +1,135 @@
+# prometheus/rules/recording_rules.yml
+# Pre-computed metrics for the Heart Disease MLOps pipeline.
+# Feeds alerting rules and Grafana dashboards.
+
+groups:
+
+  # ── Prediction throughput ─────────────────────────────────────────────────
+  - name: hd_prediction_recordings
+    interval: 15s
+    rules:
+
+      # Predictions per second (1-min rate)
+      - record: job:hd_predictions:rate1m
+        expr: |
+          rate(streamlit_predictions_total_total[1m])
+
+      # Predictions per minute (human-readable for dashboards)
+      - record: job:hd_predictions_per_minute:rate1m
+        expr: |
+          rate(streamlit_predictions_total_total[1m]) * 60
+
+      # Cumulative total predictions (for counters panel)
+      - record: job:hd_predictions_total:sum
+        expr: |
+          streamlit_predictions_total_total
+
+      # 5-minute rolling prediction rate (smoothed trend)
+      - record: job:hd_predictions:rate5m
+        expr: |
+          rate(streamlit_predictions_total_total[5m]) * 60
+
+  # ── Prediction probability distribution ───────────────────────────────────
+  - name: hd_prediction_prob_recordings
+    interval: 15s
+    rules:
+
+      # P50 prediction probability (median risk score)
+      - record: job:hd_prediction_prob_p50:rate5m
+        expr: |
+          histogram_quantile(0.50,
+            rate(streamlit_prediction_prob_bucket[5m])
+          )
+
+      # P90 prediction probability
+      - record: job:hd_prediction_prob_p90:rate5m
+        expr: |
+          histogram_quantile(0.90,
+            rate(streamlit_prediction_prob_bucket[5m])
+          )
+
+      # P95 prediction probability
+      - record: job:hd_prediction_prob_p95:rate5m
+        expr: |
+          histogram_quantile(0.95,
+            rate(streamlit_prediction_prob_bucket[5m])
+          )
+
+      # Average prediction probability (mean risk score)
+      - record: job:hd_prediction_prob_avg:rate5m
+        expr: |
+          rate(streamlit_prediction_prob_sum[5m])
+          /
+          (rate(streamlit_prediction_prob_count[5m]) + 0.001)
+
+      # High-risk prediction rate (prob >= 0.6 bucket threshold)
+      # Counts predictions that landed in bucket le="0.6" vs total
+      - record: job:hd_high_risk_ratio:rate5m
+        expr: |
+          1 - (
+            rate(streamlit_prediction_prob_bucket{le="0.6"}[5m])
+            /
+            (rate(streamlit_prediction_prob_count[5m]) + 0.001)
+          )
+
+  # ── Data drift ────────────────────────────────────────────────────────────
+  - name: hd_drift_recordings
+    interval: 15s
+    rules:
+
+      # Current drift score (fraction of drifted features, 0–1)
+      - record: job:hd_drift_score:current
+        expr: |
+          streamlit_drift_score
+
+      # Current count of drifted features
+      - record: job:hd_drift_features:current
+        expr: |
+          streamlit_drift_features
+
+      # Last batch size
+      - record: job:hd_batch_size:current
+        expr: |
+          streamlit_last_batch_size
+
+      # 5-minute average drift score (smoothed)
+      - record: job:hd_drift_score:avg5m
+        expr: |
+          avg_over_time(streamlit_drift_score[5m])
+
+      # 1-hour max drift score (worst case window)
+      - record: job:hd_drift_score:max1h
+        expr: |
+          max_over_time(streamlit_drift_score[1h])
+
+  # ── Host system (node_exporter) ───────────────────────────────────────────
+  - name: hd_system_recordings
+    interval: 30s
+    rules:
+
+      # Host CPU usage %
+      - record: instance:node_cpu_usage:avg
+        expr: |
+          100 - (
+            avg by (instance) (
+              rate(node_cpu_seconds_total{mode="idle"}[1m])
+            ) * 100
+          )
+
+      # Host memory usage %
+      - record: instance:node_memory_used_percent:gauge
+        expr: |
+          100 * (1 - (
+            node_memory_MemAvailable_bytes
+            /
+            node_memory_MemTotal_bytes
+          ))
+
+      # Host disk usage % (root filesystem)
+      - record: instance:node_disk_used_percent:gauge
+        expr: |
+          100 * (1 - (
+            node_filesystem_avail_bytes{mountpoint="/", fstype!="tmpfs"}
+            /
+            node_filesystem_size_bytes{mountpoint="/", fstype!="tmpfs"}
+          ))

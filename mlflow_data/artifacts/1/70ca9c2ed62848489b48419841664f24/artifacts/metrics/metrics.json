@@ -1,0 +1,30 @@
+{
+  "model": "xgboost",
+  "overall_oof_auc": 0.955341,
+  "overall_oof_ap": 0.94866,
+  "mean_fold_auc": 0.955344,
+  "std_fold_auc": 0.000432,
+  "fold_scores": [
+    {
+      "fold": 1,
+      "ens_auc": 0.955702
+    },
+    {
+      "fold": 2,
+      "ens_auc": 0.954688
+    },
+    {
+      "fold": 3,
+      "ens_auc": 0.95546
+    },
+    {
+      "fold": 4,
+      "ens_auc": 0.955018
+    },
+    {
+      "fold": 5,
+      "ens_auc": 0.955851
+    }
+  ],
+  "mlflow_run_id": "70ca9c2ed62848489b48419841664f24"
+}

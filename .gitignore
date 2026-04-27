@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+airflow.cfg
+*.py[cod]
+.venv/
+venv/
+
+# DVC-tracked large files (tracked by .dvc files instead)
+data/raw/*.csv
+data/processed/
+outputs/
+
+# Keep structure markers
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!outputs/.gitkeep
+
+# DVC internals
+/tmp
+.dvc/cache
+.dvc/tmp
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+.env
+.coverage
+prometheus_data/
+airflow/logs

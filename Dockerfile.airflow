@@ -1,0 +1,19 @@
+# ── Airflow image with DVC + MLflow client installed ─────────────────────
+FROM apache/airflow:3.1.8
+
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ git curl psmisc && \
+    rm -rf /var/lib/apt/lists/*
+USER airflow
+
+# Install Docker provider (which includes the docker python SDK) and MLflow
+RUN pip install --no-cache-dir \
+    apache-airflow-providers-docker \
+    apache-airflow-providers-common-io \
+    mlflow>=2.9
+
+COPY --chown=airflow:root airflow/dags/ /opt/airflow/dags/
+
+ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
+ENV AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False

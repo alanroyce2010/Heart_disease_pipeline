@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+RUN pip install --no-cache-dir mlflow
+
+RUN apt update && apt install -y curl
+
+CMD ["bash", "-c", "\
+  mkdir -p /mlflow/artifacts /mlflow/tracking && \
+  chmod -R 777 /mlflow && \
+  mlflow server \
+    --host 0.0.0.0 \
+    --port 5000 \
+    --backend-store-uri sqlite:////mlflow/tracking/mlflow.db \
+    --default-artifact-root /mlflow/artifacts \
+    --allowed-hosts '*' \
+    --cors-allowed-origins '*' \
+"]

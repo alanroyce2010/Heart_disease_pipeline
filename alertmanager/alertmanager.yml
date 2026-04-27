@@ -1,0 +1,285 @@
+global:
+  smtp_smarthost: "smtp.gmail.com:587"
+  smtp_from: "alanroyce2010@gmail.com"
+  smtp_auth_username: "alanroyce2010@gmail.com"
+  smtp_auth_password: "<API_KEY>"
+  smtp_require_tls: true
+  resolve_timeout: 5m
+
+templates:
+  - "/etc/alertmanager/templates/*.tmpl"
+
+# ── Routing tree ──────────────────────────────────────────────────────────────
+route:
+  receiver: "email-default"
+  group_by:
+    - alertname
+    - severity
+    - job
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+
+    # Critical alerts — fastest delivery, repeat every hour
+    - matchers:
+        - severity = critical
+      receiver: "email-critical"
+      group_wait: 5s
+      group_interval: 1m
+      repeat_interval: 1h
+      continue: false
+
+    # Drift-specific alerts — separate thread so they don't get buried
+    - matchers:
+        - alertname =~ "ModerateDrift|SevereDrift|DriftFeatureCountHigh|DriftScoreSustainedHigh"
+      receiver: "email-drift"
+      group_wait: 15s
+      group_interval: 5m
+      repeat_interval: 2h
+      continue: true
+
+    # Prediction anomaly alerts
+    - matchers:
+        - alertname =~ "NoPredictionsFor15Minutes|PredictionRateSuddenDrop|HighRiskPredictionSpike|PredictionProbabilityAlwaysHigh|PredictionProbabilityAlwaysLow"
+      receiver: "email-prediction"
+      group_wait: 15s
+      group_interval: 5m
+      repeat_interval: 2h
+      continue: false
+
+    # Warning alerts
+    - matchers:
+        - severity = warning
+      receiver: "email-warning"
+      group_wait: 30s
+      repeat_interval: 2h
+      continue: false
+
+    # Infra alerts (node_exporter / host resources)
+    - matchers:
+        - team = infra
+      receiver: "email-infra"
+      group_wait: 30s
+      repeat_interval: 3h
+      continue: true
+
+    # Info — low noisalerte, long repeat
+    - matchers:
+        - severity = info
+      receiver: "email-info"
+      repeat_interval: 12h
+
+# ── Inhibition rules ──────────────────────────────────────────────────────────
+inhibit_rules:
+
+  # If the app/serve is completely down, suppress downstream prediction alerts
+  - source_matchers:
+      - alertname =~ "StreamlitDown|MLflowServeDown"
+    target_matchers:
+      - alertname =~ "NoPredictionsFor15Minutes|PredictionRateSuddenDrop|PredictionProbabilityAlwaysHigh|PredictionProbabilityAlwaysLow|HighRiskPredictionSpike"
+    equal:
+      - job
+
+  # Critical suppresses warning for the same alert on the same instance
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal:
+      - alertname
+      - instance
+
+  # Severe drift suppresses moderate drift (same metric, worse condition covers it)
+  - source_matchers:
+      - alertname = SevereDrift
+    target_matchers:
+      - alertname =~ "ModerateDrift|DriftFeatureCountHigh"
+    equal:
+      - job
+
+  # Sustained drift suppresses one-off drift alerts
+  - source_matchers:
+      - alertname = DriftScoreSustainedHigh
+    target_matchers:
+      - alertname =~ "ModerateDrift|SevereDrift"
+    equal:
+      - job
+
+  # Node exporter down suppresses all host resource alerts
+  - source_matchers:
+      - alertname = NodeExporterDown
+    target_matchers:
+      - alertname =~ "HostHighCPU|HostCriticalCPU|HostHighMemory|HostCriticalMemory|HostDiskNearFull|HostDiskCritical"
+    equal:
+      - instance
+
+# ── Receivers ─────────────────────────────────────────────────────────────────
+receivers:
+
+  # Default catch-all
+  - name: "email-default"
+    email_configs:
+      - to: "alanroyce2010@gmail.com"
+        send_resolved: true
+        headers:
+          Subject: "[Heart Disease MLOps] {{ .GroupLabels.alertname }} — {{ .Status | toUpper }}"
+        text: |
+          Heart Disease Pipeline Alert
+          ════════════════════════════
+          {{ range .Alerts }}
+          Alert     : {{ .Annotations.summary }}
+          Severity  : {{ .Labels.severity }}
+          Job       : {{ .Labels.job }}
+          Instance  : {{ .Labels.instance }}
+          Description: {{ .Annotations.description }}
+          Fired at  : {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ if .Annotations.runbook }}Runbook : {{ .Annotations.runbook }}{{ end }}
+          ────────────────────────────
+          {{ end }}
+
+  # Critical — HTML email, loudest subject line
+  - name: "email-critical"
+    email_configs:
+      - to: "alanroyce2010@gmail.com"
+        send_resolved: true
+        headers:
+          Subject: "🚨 CRITICAL [Heart Disease MLOps]: {{ .GroupLabels.alertname }}"
+        html: |
+          <div style="font-family:Arial,sans-serif;max-width:600px;">
+            <h2 style="color:#c0392b;border-bottom:2px solid #c0392b;padding-bottom:8px;">
+              🚨 Critical Alert — Heart Disease Pipeline
+            </h2>
+            {{ range .Alerts }}
+            <div style="background:#fdf0f0;border-left:4px solid #c0392b;padding:12px;margin-bottom:16px;border-radius:4px;">
+              <p style="margin:0 0 8px;font-size:16px;font-weight:bold;">{{ .Annotations.summary }}</p>
+              <p style="margin:0 0 6px;color:#555;">{{ .Annotations.description }}</p>
+              <table style="font-size:13px;color:#333;">
+                <tr><td style="padding-right:12px;font-weight:bold;">Severity</td><td>{{ .Labels.severity }}</td></tr>
+                <tr><td style="padding-right:12px;font-weight:bold;">Job</td><td>{{ .Labels.job }}</td></tr>
+                <tr><td style="padding-right:12px;font-weight:bold;">Instance</td><td>{{ .Labels.instance }}</td></tr>
+                <tr><td style="padding-right:12px;font-weight:bold;">Fired at</td><td>{{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}</td></tr>
+                {{ if .Annotations.runbook }}
+                <tr><td style="padding-right:12px;font-weight:bold;">Runbook</td><td style="font-family:monospace;">{{ .Annotations.runbook }}</td></tr>
+                {{ end }}
+              </table>
+            </div>
+            {{ end }}
+            <p style="font-size:12px;color:#999;">Heart Disease MLOps Pipeline · Prometheus Alertmanager</p>
+          </div>
+
+  # Drift-specific alerts
+  - name: "email-drift"
+    email_configs:
+      - to: "alanroyce2010@gmail.com"
+        send_resolved: true
+        headers:
+          Subject: "⚠️ Data Drift [Heart Disease MLOps]: {{ .GroupLabels.alertname }}"
+        html: |
+          <div style="font-family:Arial,sans-serif;max-width:600px;">
+            <h2 style="color:#e67e22;border-bottom:2px solid #e67e22;padding-bottom:8px;">
+              ⚠️ Data Drift Detected — Heart Disease Pipeline
+            </h2>
+            {{ range .Alerts }}
+            <div style="background:#fef9f0;border-left:4px solid #e67e22;padding:12px;margin-bottom:16px;border-radius:4px;">
+              <p style="margin:0 0 8px;font-size:16px;font-weight:bold;">{{ .Annotations.summary }}</p>
+              <p style="margin:0 0 6px;color:#555;">{{ .Annotations.description }}</p>
+              <table style="font-size:13px;color:#333;">
+                <tr><td style="padding-right:12px;font-weight:bold;">Severity</td><td>{{ .Labels.severity }}</td></tr>
+                <tr><td style="padding-right:12px;font-weight:bold;">Fired at</td><td>{{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}</td></tr>
+                {{ if .Annotations.runbook }}
+                <tr><td style="padding-right:12px;font-weight:bold;">Retrain</td><td style="font-family:monospace;">{{ .Annotations.runbook }}</td></tr>
+                {{ end }}
+              </table>
+            </div>
+            {{ end }}
+            <p style="font-size:12px;color:#999;">
+              Check the Drift Monitor tab at <a href="http://localhost:8501">localhost:8501</a>
+              for the feature-level breakdown.
+            </p>
+          </div>
+
+  # Prediction anomaly alerts
+  - name: "email-prediction"
+    email_configs:
+      - to: "alanroyce2010@gmail.com"
+        send_resolved: true
+        headers:
+          Subject: "🔮 Prediction Alert [Heart Disease MLOps]: {{ .GroupLabels.alertname }}"
+        html: |
+          <div style="font-family:Arial,sans-serif;max-width:600px;">
+            <h2 style="color:#8e44ad;border-bottom:2px solid #8e44ad;padding-bottom:8px;">
+              🔮 Prediction Anomaly — Heart Disease Pipeline
+            </h2>
+            {{ range .Alerts }}
+            <div style="background:#f9f0ff;border-left:4px solid #8e44ad;padding:12px;margin-bottom:16px;border-radius:4px;">
+              <p style="margin:0 0 8px;font-size:16px;font-weight:bold;">{{ .Annotations.summary }}</p>
+              <p style="margin:0 0 6px;color:#555;">{{ .Annotations.description }}</p>
+              <table style="font-size:13px;color:#333;">
+                <tr><td style="padding-right:12px;font-weight:bold;">Severity</td><td>{{ .Labels.severity }}</td></tr>
+                <tr><td style="padding-right:12px;font-weight:bold;">Job</td><td>{{ .Labels.job }}</td></tr>
+                <tr><td style="padding-right:12px;font-weight:bold;">Fired at</td><td>{{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}</td></tr>
+              </table>
+            </div>
+            {{ end }}
+            <p style="font-size:12px;color:#999;">
+              View the Predict tab at <a href="http://localhost:8501">localhost:8501</a> ·
+              MLflow tracking at <a href="http://localhost:5000">localhost:5000</a>
+            </p>
+          </div>
+
+  # Warning alerts
+  - name: "email-warning"
+    email_configs:
+      - to: "alanroyce2010@gmail.com"
+        send_resolved: true
+        headers:
+          Subject: "⚠️ WARNING [Heart Disease MLOps]: {{ .GroupLabels.alertname }}"
+        text: |
+          Heart Disease Pipeline — Warning
+          ════════════════════════════════
+          {{ range .Alerts }}
+          [WARNING] {{ .Annotations.summary }}
+
+          Description : {{ .Annotations.description }}
+          Job         : {{ .Labels.job }}
+          Instance    : {{ .Labels.instance }}
+          Fired at    : {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ if .Annotations.runbook }}Runbook : {{ .Annotations.runbook }}{{ end }}
+          ────────────────────────────────
+          {{ end }}
+
+  # Infra / host resource alerts
+  - name: "email-infra"
+    email_configs:
+      - to: "alanroyce2010@gmail.com"
+        send_resolved: true
+        headers:
+          Subject: "[INFRA] [Heart Disease MLOps]: {{ .GroupLabels.alertname }}"
+        text: |
+          Heart Disease Pipeline — Infrastructure Alert
+          ══════════════════════════════════════════════
+          {{ range .Alerts }}
+          Alert     : {{ .Annotations.summary }}
+          Host      : {{ .Labels.instance }}
+          Severity  : {{ .Labels.severity }}
+          Description: {{ .Annotations.description }}
+          Fired at  : {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ if .Annotations.runbook }}Runbook : {{ .Annotations.runbook }}{{ end }}
+          ────────────────────────────────────────────
+          {{ end }}
+
+  # Info — low noise, no resolved email
+  - name: "email-info"
+    email_configs:
+      - to: "alanroyce2010@gmail.com"
+        send_resolved: false
+        headers:
+          Subject: "[INFO] [Heart Disease MLOps]: {{ .GroupLabels.alertname }}"
+        text: |
+          {{ range .Alerts }}
+          [INFO] {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          Fired at: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ end }}
