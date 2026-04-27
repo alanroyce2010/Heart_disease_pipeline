@@ -81,12 +81,12 @@ def _stage_failure_email(stage_name: str, extra_context: str = "") -> str:
         </tr>
         <tr style="background:#f8f8f8;">
           <td style="padding:6px 10px;font-weight:bold;">Time (UTC)</td>
-          <td style="padding:6px 10px;">{{{{ execution_date }}}}</td>
+          <td style="padding:6px 10px;">{{{{ ds }}}}</td>
         </tr>
         <tr>
           <td style="padding:6px 10px;font-weight:bold;">Airflow Logs</td>
           <td style="padding:6px 10px;">
-            <a href="{{{{ conf.get('webserver', 'base_url') }}}}/dags/heart_disease_pipeline/grid">
+            <a href="http://localhost:8080/dags/heart_disease_pipeline/grid">
               View in Airflow UI
             </a>
           </td>
@@ -238,7 +238,7 @@ def _build_success_email_body(**ctx) -> str:
       </p>
       <p style="font-size:11px;color:#999;margin-top:12px;">
         Heart Disease MLOps Pipeline · Apache Airflow ·
-        Run: {{{{ execution_date }}}}
+        Run: {{{{ ds }}}}
       </p>
     </div>
     """
@@ -366,31 +366,31 @@ with DAG(
     )
 
     # ── 3c. DVC serve_best ─────────────────────────────────────────────────
-    # dvc_serve_best = DockerOperator(
-    #     task_id       = "run_dvc_serve_best",
-    #     image         = "hd_pipeline_image:latest",
-    #     command       = "bash -c 'dvc repro serve_best'",
-    #     docker_url    = "unix://var/run/docker.sock",
-    #     network_mode  = DOCKER_NETWORK,
-    #     mounts        = DVC_MOUNTS,
-    #     working_dir   = "/opt/pipeline",
-    #     environment   = ENV_VARS,
-    #     mount_tmp_dir = False,
-    #     auto_remove   = "force",
-    #     device_requests = GPU_REQUEST,
-    # )
+    dvc_serve_best = DockerOperator(
+        task_id       = "run_dvc_serve_best",
+        image         = "hd_pipeline_image:latest",
+        command       = "bash -c 'dvc repro serve_best'",
+        docker_url    = "unix://var/run/docker.sock",
+        network_mode  = DOCKER_NETWORK,
+        mounts        = DVC_MOUNTS,
+        working_dir   = "/opt/pipeline",
+        environment   = ENV_VARS,
+        mount_tmp_dir = False,
+        auto_remove   = "force",
+        device_requests = GPU_REQUEST,
+    )
 
-    # email_serve_best_failed = EmailOperator(
-    #     task_id      = "email_serve_best_failed",
-    #     to           = ALERT_EMAIL,
-    #     subject      = "❌ [Heart Disease Pipeline] Stage Failed: serve_best",
-    #     html_content = _stage_failure_email(
-    #         "run_dvc_serve_best",
-    #         "serve_best.py failed to compare models or promote the winner to "
-    #         "MLflow Production. Check the MLflow registry at http://localhost:5000."
-    #     ),
-    #     trigger_rule = TriggerRule.ONE_FAILED,
-    # )
+    email_serve_best_failed = EmailOperator(
+        task_id      = "email_serve_best_failed",
+        to           = ALERT_EMAIL,
+        subject      = "❌ [Heart Disease Pipeline] Stage Failed: serve_best",
+        html_content = _stage_failure_email(
+            "run_dvc_serve_best",
+            "serve_best.py failed to compare models or promote the winner to "
+            "MLflow Production. Check the MLflow registry at http://localhost:5000."
+        ),
+        trigger_rule = TriggerRule.ONE_FAILED,
+    )
 
     # ── 4. Verify model registered ─────────────────────────────────────────
     check_model = BranchPythonOperator(
@@ -484,7 +484,7 @@ with DAG(
             </tr>
             <tr>
               <td style="padding:6px 10px;font-weight:bold;">Run time (UTC)</td>
-              <td style="padding:6px 10px;">{{ execution_date }}</td>
+              <td style="padding:6px 10px;">{{ ds }}</td>
             </tr>
             <tr style="background:#f8f8f8;">
               <td style="padding:6px 10px;font-weight:bold;">MLflow</td>
@@ -528,32 +528,25 @@ with DAG(
 
     # Train
     dvc_preprocess >> dvc_train
-    dvc_train >> email_train_failed
-
-    # Serve best
-    dvc_train >> check_model
-    # dvc_serve_best >> email_serve_best_failed
-
-    # Check model
-     
-    check_model >> email_check_model_failed
-
-    # Restart services
-    check_model >> restart_services
+    dvc_train       >> dvc_serve_best                                                                                                                                                     
+    dvc_serve_best  >> email_serve_best_failed
+    dvc_serve_best  >> check_model                                                                                                                                                        
+    check_model     >> email_check_model_failed
+    check_model     >> restart_services                                                                                                                                                   
     restart_services >> email_restart_failed
-
+                                                                                                                                                                                          
     # Success path
-    restart_services >> collect_metrics >> build_success_body >> email_pipeline_success
-
-    # Pipeline-level failure email (fires if ANY upstream task failed)
+    restart_services >> collect_metrics >> build_success_body >> email_pipeline_success                                                                                                   
+                
+    # Pipeline-level failure email (fires if ANY upstream task failed)                                                                                                                    
     [
-        email_stage_data_failed,
+        email_stage_data_failed,                                                                                                                                                          
         email_preprocess_failed,
         email_train_failed,
-        
+        email_serve_best_failed,
         email_check_model_failed,
-        email_restart_failed,
-    ] >> email_pipeline_failed
+        email_restart_failed,                                                                                                                                                             
+    ] >> email_pipeline_failed     
 
     # Always-run completion log
     [email_pipeline_success, email_pipeline_failed] >> pipeline_done
